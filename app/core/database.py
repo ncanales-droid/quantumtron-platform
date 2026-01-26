@@ -1,5 +1,6 @@
 """Database configuration with async SQLAlchemy."""
 
+import logging
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -10,6 +11,8 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -74,7 +77,7 @@ async def init_db() -> None:
         # Create in-memory SQLite engine
         engine = create_async_engine(
             "sqlite+aiosqlite:///:memory:",
-            echo=settings.DEBUG,
+            echo=settings.DB_ECHO,
             future=True,
         )
         
