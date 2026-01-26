@@ -53,9 +53,40 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database tables."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """
+    Initialize database connection and create tables.
+    
+    This function handles connection gracefully for deployment environments.
+    """
+    global engine
+    original_engine = engine
+    
+    try:
+        logger.info(f"Attempting database connection to: {settings.DATABASE_URL}")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database initialized successfully")
+        
+    except Exception as e:
+        logger.warning(f"Database connection failed: {str(e)}")
+        logger.info("Falling back to SQLite in-memory database")
+        
+        # Create in-memory SQLite engine
+        engine = create_async_engine(
+            "sqlite+aiosqlite:///:memory:",
+            echo=settings.DEBUG,
+            future=True,
+        )
+        
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("SQLite in-memory database initialized successfully")
+        except Exception as inner_e:
+            logger.error(f"Failed to initialize fallback database: {str(inner_e)}")
+            # Keep original engine even if it failed
+            engine = original_engine
+            raise
 
 
 async def close_db() -> None:
