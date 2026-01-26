@@ -21,14 +21,12 @@ class Base(DeclarativeBase):
     pass
 
 
-# Create async engine
+# Create async engine - use SQLite in-memory for Railway
+# This gets overridden in init_db() but we need a default
 engine: AsyncEngine = create_async_engine(
-    settings.DATABASE_URL,
+    "sqlite+aiosqlite:///:memory:",
     echo=settings.DB_ECHO,
     future=True,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
 )
 
 # Create async session factory
@@ -59,37 +57,38 @@ async def init_db() -> None:
     """
     Initialize database connection and create tables.
     
-    This function handles connection gracefully for deployment environments.
+    For Railway deployment, always use SQLite in-memory.
     """
     global engine
-    original_engine = engine
     
     try:
-        logger.info(f"Attempting database connection to: {settings.DATABASE_URL}")
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database initialized successfully")
+        # Always use SQLite in-memory for Railway deployment
+        logger.info("Using SQLite in-memory database for Railway deployment")
         
-    except Exception as e:
-        logger.warning(f"Database connection failed: {str(e)}")
-        logger.info("Falling back to SQLite in-memory database")
-        
-        # Create in-memory SQLite engine
+        # Recreate engine to ensure fresh connection
         engine = create_async_engine(
             "sqlite+aiosqlite:///:memory:",
             echo=settings.DB_ECHO,
             future=True,
         )
         
-        try:
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-            logger.info("SQLite in-memory database initialized successfully")
-        except Exception as inner_e:
-            logger.error(f"Failed to initialize fallback database: {str(inner_e)}")
-            # Keep original engine even if it failed
-            engine = original_engine
-            raise
+        # Update session factory with new engine
+        global AsyncSessionLocal
+        AsyncSessionLocal = async_sessionmaker(
+            engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+        
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("SQLite in-memory database initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {str(e)}")
+        raise
 
 
 async def close_db() -> None:
