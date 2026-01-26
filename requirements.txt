@@ -1,0 +1,44 @@
+# FastAPI and web server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+alembic==1.12.1
+
+# Authentication and Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-decouple==3.8
+
+# Configuration
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Data Processing and Analysis
+pandas==2.1.3
+numpy==1.26.2
+scipy==1.11.4
+statsmodels==0.14.0
+scikit-learn==1.3.2
+xgboost==1.7.6
+joblib==1.3.2
+openpyxl==3.1.2
+pyarrow==14.0.1
+
+# Redis (optional, for caching)
+redis==5.0.1
+hiredis==2.2.3
+
+# Utilities
+python-dateutil==2.8.2
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
