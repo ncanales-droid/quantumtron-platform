@@ -1,6 +1,5 @@
 ﻿[build]
 builder = "nixpacks"
-buildCommand = "pip install -r requirements.txt"
 
 [build.environment]
 PYTHON_VERSION = "3.12"
@@ -8,4 +7,3 @@ PYTHON_VERSION = "3.12"
 [deploy]
 startCommand = "python main.py"
 healthCheckPath = "/health"
-healthCheckTimeout = 60
