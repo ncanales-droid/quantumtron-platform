@@ -22,10 +22,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     # Database
-    DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://postgres:postgres@localhost:5432/quantumtron",
-        description="PostgreSQL database URL with asyncpg driver"
-    )
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./quantumtron.db")
     DB_ECHO: bool = Field(default=False, description="Echo SQL queries")
 
     # Security
