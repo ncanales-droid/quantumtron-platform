@@ -64,10 +64,10 @@ app = FastAPI(
 # Configure CORS - TEMPORAL: Permitir todo para debug
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Temporal: permitir todos los orígenes
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "Content-Type", "Authorization", "Accept", "X-Requested-With"],
 )
 
 
