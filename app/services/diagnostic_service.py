@@ -251,3 +251,143 @@ async def perform_quick_diagnostic(df: pd.DataFrame) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error in quick diagnostic: {str(e)}")
         return {"error": str(e)}
+
+
+async def perform_diagnosis(
+    df: pd.DataFrame, 
+    db: AsyncSession, 
+    current_user: Dict = None
+) -> Dict[str, Any]:
+    """
+    Perform automated diagnosis on a DataFrame for the upload endpoint.
+    
+    Args:
+        df: Pandas DataFrame to analyze
+        db: Database session
+        current_user: Current user information (optional)
+        
+    Returns:
+        Dict with diagnosis results
+    """
+    try:
+        logger.info(f"Starting diagnosis for DataFrame shape: {df.shape}")
+        
+        # Use the quick diagnostic function for basic analysis
+        quick_results = await perform_quick_diagnostic(df)
+        
+        # Format results for the diagnostics endpoint
+        results = {
+            "summary": f"Analyzed {len(df)} rows with {len(df.columns)} columns",
+            "issues_found": 0,
+            "recommendations": [],
+            "warnings": [],
+            "columns": list(df.columns),
+            "data_types": {col: str(dtype) for col, dtype in df.dtypes.items()},
+            "basic_statistics": quick_results.get("basic_info", {}),
+            "missing_values": quick_results.get("missing_values", {}),
+            "descriptive_stats": quick_results.get("descriptive_stats", {})
+        }
+        
+        # Check for issues based on the analysis
+        missing_data = quick_results.get("missing_values", {})
+        if isinstance(missing_data, pd.DataFrame) and not missing_data.empty:
+            total_missing = missing_data['missing_count'].sum() if 'missing_count' in missing_data.columns else 0
+            if total_missing > 0:
+                results["issues_found"] += 1
+                results["warnings"].append(f"Found {total_missing} missing values")
+                results["recommendations"].append("Consider imputation strategies for missing values")
+        
+        # Check for potential data quality issues
+        if len(df) == 0:
+            results["issues_found"] += 1
+            results["warnings"].append("Dataset is empty")
+            results["recommendations"].append("Upload a non-empty CSV file")
+        
+        if len(df.columns) == 0:
+            results["issues_found"] += 1
+            results["warnings"].append("Dataset has no columns")
+            results["recommendations"].append("Check the CSV file format")
+        
+        # Check for duplicate rows
+        duplicate_rows = df.duplicated().sum()
+        if duplicate_rows > 0:
+            results["issues_found"] += 1
+            results["warnings"].append(f"Found {duplicate_rows} duplicate rows")
+            results["recommendations"].append("Consider removing duplicate rows")
+            results["duplicate_rows"] = duplicate_rows
+        
+        # Check column names for issues
+        problematic_cols = []
+        for col in df.columns:
+            if pd.isna(col) or str(col).strip() == "":
+                problematic_cols.append(str(col))
+            elif any(char in str(col) for char in ['\n', '\r', '\t']):
+                problematic_cols.append(str(col))
+        
+        if problematic_cols:
+            results["issues_found"] += 1
+            results["warnings"].append(f"Found {len(problematic_cols)} columns with problematic names")
+            results["recommendations"].append("Clean column names (remove empty names, newlines, tabs)")
+            results["problematic_columns"] = problematic_cols
+        
+        # Try to detect outliers in numeric columns
+        try:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            if len(numeric_cols) > 0:
+                # Simple outlier detection using IQR
+                for col in numeric_cols[:5]:  # Limit to first 5 columns for performance
+                    col_data = df[col].dropna()
+                    if len(col_data) > 0:
+                        Q1 = col_data.quantile(0.25)
+                        Q3 = col_data.quantile(0.75)
+                        IQR = Q3 - Q1
+                        lower_bound = Q1 - 1.5 * IQR
+                        upper_bound = Q3 + 1.5 * IQR
+                        outliers = col_data[(col_data < lower_bound) | (col_data > upper_bound)]
+                        
+                        if len(outliers) > 0:
+                            results["warnings"].append(f"Column '{col}' has {len(outliers)} potential outliers")
+        except Exception as outlier_error:
+            logger.warning(f"Outlier detection failed: {str(outlier_error)}")
+        
+        # Save results to database if user is authenticated
+        if current_user:
+            try:
+                from datetime import datetime
+                
+                # Use the existing DiagnosticResult model
+                result_record = DiagnosticResult(
+                    dataset_id=0,  # Use 0 for uploaded files (not from database)
+                    analysis_type="upload_diagnosis",
+                    result_data=results,
+                    parameters={"filename": "uploaded_file", "user_id": current_user.get("id")},
+                    status="completed",
+                    created_by=current_user.get("username", "anonymous")
+                )
+                
+                db.add(result_record)
+                await db.commit()
+                await db.refresh(result_record)
+                
+                results["database_record_id"] = result_record.id
+                
+            except Exception as db_error:
+                logger.error(f"Failed to save diagnostic result to database: {str(db_error)}")
+                # Continue even if database save fails
+        
+        logger.info(f"Diagnosis completed. Issues found: {results['issues_found']}")
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error in perform_diagnosis: {str(e)}", exc_info=True)
+        # Return minimal results in case of error
+        return {
+            "summary": f"Error during analysis: {str(e)[:100]}",
+            "issues_found": 1,
+            "recommendations": ["Please check your data format and try again"],
+            "error": str(e),
+            "basic_info": {
+                "row_count": len(df) if 'df' in locals() else 0,
+                "column_count": len(df.columns) if 'df' in locals() else 0
+            }
+        }
