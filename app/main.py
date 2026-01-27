@@ -61,13 +61,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS - TEMPORAL: Permitir todo para debug
+# Configure CORS - Solución completa
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*", "Content-Type", "Authorization", "Accept", "X-Requested-With"],
+    allow_origins=["*"],  # Permitir todos los orígenes
+    allow_methods=["*"],  # Permitir todos los métodos
+    allow_headers=["*"],  # Permitir todos los headers
+    expose_headers=["*"],  # Exponer todos los headers
+    allow_credentials=False,  # Temporalmente false para debug
+    max_age=600,  # Cache de preflight por 10 minutos
 )
 
 
@@ -99,6 +101,11 @@ async def audit_logging_middleware(request: Request, call_next):
         response = await call_next(request)
         process_time = time.time() - start_time
 
+        # Asegurar headers CORS en cada respuesta
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        
         # Log response
         logger.info(
             f"Response: {request.method} {request.url.path} | "
@@ -136,10 +143,13 @@ async def quantumtron_exception_handler(
         JSONResponse: Error response
     """
     logger.error(f"QuantumTronException: {exc.detail}")
-    return JSONResponse(
+    response = JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
     )
+    # Asegurar CORS en errores también
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
 
 
 @app.exception_handler(Exception)
@@ -157,10 +167,13 @@ async def general_exception_handler(
         JSONResponse: Error response
     """
     logger.exception(f"Unhandled exception: {str(exc)}")
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Internal server error"},
     )
+    # Asegurar CORS en errores también
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
 
 
 # Include routers
