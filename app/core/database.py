@@ -53,6 +53,21 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+async def get_database_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependency for getting database session (alternative name).
+    This is used by diagnostics.py and other endpoints.
+
+    Yields:
+        AsyncSession: Database session
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
+
 async def init_db() -> None:
     """
     Initialize database connection and create tables.
