@@ -5,7 +5,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -181,6 +181,22 @@ app.include_router(health.router, prefix=settings.API_V1_PREFIX)
 app.include_router(datasets.router, prefix=settings.API_V1_PREFIX)
 app.include_router(diagnostics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ml_unified.router, prefix=settings.API_V1_PREFIX)
+
+
+@app.post("/test-upload")
+async def test_upload(file: UploadFile = File(...)):
+    """Simple test endpoint."""
+    try:
+        contents = await file.read()
+        return {
+            "filename": file.filename,
+            "size": len(contents),
+            "content_type": file.content_type,
+            "success": True
+        }
+    except Exception as e:
+        logger.error(f"Test upload error: {str(e)}", exc_info=True)
+        raise
 
 
 @app.get("/lovable-health")
