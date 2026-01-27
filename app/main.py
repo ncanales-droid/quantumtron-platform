@@ -61,28 +61,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS - Habilitar Lovable y local development
-allowed_origins = [
-    "https://app.lovable.dev",
-    "https://*.lovable.dev", 
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:8000",
-    # También mantener los orígenes existentes de settings
-    *settings.CORS_ORIGINS
-]
-
-# Remover duplicados y "*" si existe
-if "*" in allowed_origins:
-    allowed_origins = [
-        origin for origin in allowed_origins 
-        if origin != "*"
-    ]
-allowed_origins = list(set(allowed_origins))
-
+# Configure CORS - TEMPORAL: Permitir todo para debug
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["*"],  # Temporal: permitir todos los orígenes
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -196,4 +178,21 @@ async def lovable_health():
         "service": "QuantumTron API",
         "version": settings.APP_VERSION,
         "timestamp": time.time()
+    }
+
+
+@app.get("/", tags=["root"])
+async def root():
+    """
+    Root endpoint.
+
+    Returns:
+        dict: API information
+    """
+    return {
+        "name": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "status": "running",
+        "docs": "/docs",
+        "api_prefix": settings.API_V1_PREFIX,
     }
