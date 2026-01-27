@@ -44,7 +44,7 @@ def convert_numpy_types(obj):
 async def upload_and_diagnose(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_database_session),
-    current_user: dict = Depends(get_optional_user),
+    current_user: dict = None,  # CAMBIO: Hacerlo público para Lovable
 ):
     """Upload a file and perform automated diagnosis."""
     logger.info(f"Upload endpoint called with file: {file.filename}")
