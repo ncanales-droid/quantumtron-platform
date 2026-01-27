@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 import pandas as pd
+import numpy as np
 from io import StringIO
 from typing import Dict, Any
 
@@ -13,6 +14,31 @@ from app.services.diagnostic_service import perform_diagnosis
 router = APIRouter(prefix="/diagnostics", tags=["diagnostics"])
 
 logger = logging.getLogger(__name__)
+
+
+def convert_numpy_types(obj):
+    """
+    Convert numpy types to Python native types for JSON serialization.
+    """
+    if isinstance(obj, (np.integer, np.floating)):
+        return obj.item()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_numpy_types(v) for k, v in obj.items()}
+    elif isinstance(obj, list) or isinstance(obj, tuple):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, pd.Timestamp):
+        return obj.isoformat()
+    elif isinstance(obj, pd.DataFrame):
+        return obj.to_dict(orient='records')
+    elif isinstance(obj, pd.Series):
+        return obj.to_dict()
+    else:
+        return obj
+
 
 @router.post("/upload")
 async def upload_and_diagnose(
@@ -66,6 +92,9 @@ async def upload_and_diagnose(
             
             # Realizar diagnóstico
             diagnosis_result = await perform_diagnosis(df, db, current_user)
+            
+            # Convertir tipos numpy a tipos Python nativos para JSON
+            diagnosis_result = convert_numpy_types(diagnosis_result)
             
             # Registrar el diagnóstico en la base de datos si hay usuario
             if current_user:
