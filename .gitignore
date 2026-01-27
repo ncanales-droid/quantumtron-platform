@@ -1,4 +1,15 @@
-﻿# Python
+﻿# Archivos temporales y corruptos
+*~
+*.tmp
+*.temp
+* 
+*.backup
+*_backup.py
+*_final.py
+*_fixed.py
+*_working.py
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,6 +41,11 @@ wheels/
 .env.local
 .env.*.local
 
+# Test files
+test_*.py
+*_test.py
+*.csv
+
 # IDE
 .vscode/
 .idea/
@@ -42,20 +58,5 @@ Thumbs.db
 
 # Backups
 *.backup
-*_backup.py
-*_final.py
-*_fixed.py
-*_working.py
 main_*.py
-
-# Test and temp files
-test_*.py
-diagnostic*.py
-fix_*.py
-patch_*.py
-quick_test.py
-update_model.py
-
-# Data files
-*.csv
-data/models/
+requirements_*.txt
