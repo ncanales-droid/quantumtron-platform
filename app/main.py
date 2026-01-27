@@ -188,18 +188,12 @@ app.include_router(diagnostics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ml_unified.router, prefix=settings.API_V1_PREFIX)
 
 
-@app.get("/", tags=["root"])
-async def root():
-    """
-    Root endpoint.
-
-    Returns:
-        dict: API information
-    """
+@app.get("/lovable-health")
+async def lovable_health():
+    """Health check specifically for Lovable dashboard."""
     return {
-        "name": settings.APP_NAME,
+        "status": "healthy",
+        "service": "QuantumTron API",
         "version": settings.APP_VERSION,
-        "status": "running",
-        "docs": "/docs",
-        "api_prefix": settings.API_V1_PREFIX,
+        "timestamp": time.time()
     }
