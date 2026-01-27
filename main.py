@@ -1,84 +1,89 @@
-﻿"""
-QuantumTron Platform - Production Main File
+﻿#!/usr/bin/env python3
 """
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+QuantumTron Platform - VERSION DEFINITIVA
+"""
 import os
 import sys
+import logging
 
-# Agregar ruta para imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-# Crear app
-app = FastAPI(
-    title="QuantumTron Platform",
-    description="Advanced Statistical AI Platform with Florence PhD Agent",
-    version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
 
-# Configurar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://*.lovable.app",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "*"  # Temporal para debug
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Health endpoints (SIEMPRE deben funcionar)
-@app.get("/")
-async def root():
-    return {"status": "ok", "service": "quantumtron", "version": "2.0.0"}
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy", "version": "2.0.0"}
-
-@app.get("/lovable-health")
-async def lovable_health():
-    return {"status": "healthy", "for": "lovable", "version": "2.0.0"}
-
-# INTENTAR CARGAR FLORENCE (pero si falla, no rompe todo)
-try:
-    print("🚀 Intentando cargar Florence...")
-    
-    # Intentar importar Florence
-    from app.api.endpoints import florence
-    from app.api.endpoints import health as api_health
-    
-    # Incluir routers si se importaron
-    app.include_router(florence.router, prefix="/florence", tags=["florence"])
-    app.include_router(api_health.router, prefix="/api", tags=["api"])
-    
-    print("✅ Florence cargado correctamente")
-    
-    # Endpoint adicional si Florence está cargado
-    @app.get("/florence-status")
-    async def florence_status():
-        return {"florence": "loaded", "status": "ready"}
+def main():
+    """Función principal que Railway ejecutará"""
+    try:
+        # OBTENER PORT DE VARIABLES DE ENTORNO
+        port_str = os.getenv("PORT", "8000")
+        port = int(port_str)
         
-except ImportError as e:
-    print(f"⚠️  Florence no se pudo cargar: {e}")
-    print("💡 La app seguirá funcionando sin Florence")
-    
-    @app.get("/florence-status")
-    async def florence_status():
-        return {"florence": "not_loaded", "status": "degraded", "error": "Import failed"}
-    
-except Exception as e:
-    print(f"❌ Error cargando Florence: {e}")
-    print("💡 La app básica seguirá funcionando")
+        logger.info(f"🚀 INICIANDO QUANTUMTRON PLATFORM")
+        logger.info(f"📊 PORT de entorno: {port_str}")
+        logger.info(f"📊 PORT como int: {port}")
+        logger.info(f"📁 Directorio actual: {os.getcwd()}")
+        logger.info(f"🐍 Python version: {sys.version}")
+        
+        # Importar FastAPI
+        from fastapi import FastAPI
+        import uvicorn
+        
+        # Crear app
+        app = FastAPI(
+            title="QuantumTron Platform",
+            version="2.0.0"
+        )
+        
+        # Health endpoint (OBLIGATORIO para Railway)
+        @app.get("/")
+        async def root():
+            return {"status": "ok", "app": "quantumtron", "port": port}
+        
+        @app.get("/health")
+        async def health():
+            return {
+                "status": "healthy", 
+                "port": port,
+                "variables": {
+                    "PORT_set": "PORT" in os.environ,
+                    "DEEPSEEK_set": "DEEPSEEK_API_KEY" in os.environ
+                }
+            }
+        
+        # Intentar cargar Florence (opcional)
+        try:
+            logger.info("🔍 Intentando cargar Florence...")
+            from app.api.endpoints import florence
+            app.include_router(florence.router, prefix="/florence")
+            logger.info("✅ Florence cargado")
+            
+            @app.get("/florence-status")
+            async def florence_status():
+                return {"florence": "loaded", "status": "ready"}
+                
+        except ImportError as e:
+            logger.warning(f"⚠️  Florence no cargado: {e}")
+            
+            @app.get("/florence-status")
+            async def florence_status():
+                return {"florence": "not_loaded", "status": "degraded"}
+        
+        # INICIAR SERVER
+        logger.info(f"🎯 Iniciando uvicorn en 0.0.0.0:{port}")
+        uvicorn.run(
+            app, 
+            host="0.0.0.0", 
+            port=port,
+            log_level="info"
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ ERROR FATAL: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        sys.exit(1)
 
-# Inicio
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    print(f"🚀 Starting QuantumTron Platform on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    main()
