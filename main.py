@@ -4,6 +4,7 @@ QuantumTron Platform - Production Main File
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import uvicorn
 
 # Crear app
 app = FastAPI(
@@ -75,7 +76,11 @@ async def root():
 async def health():
     return {"status": "healthy", "service": "quantumtron-platform"}
 
+# Inicio de la aplicación
 if __name__ == "__main__":
-    import uvicorn
+    # Obtener puerto de variable de entorno o usar 8000 por defecto
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    host = os.getenv("HOST", "0.0.0.0")
+    
+    print(f"🚀 Iniciando QuantumTron Platform en {host}:{port}")
+    uvicorn.run(app, host=host, port=port)
