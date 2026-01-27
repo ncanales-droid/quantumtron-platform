@@ -5,6 +5,7 @@ sqlalchemy==2.0.23
 pydantic==2.5.0
 pydantic-settings==2.1.0
 python-multipart==0.0.6
+aiosqlite==0.20.0  # ← NUEVO: Para async SQLite
 
 # AI/ML
 openai==1.6.1
@@ -20,7 +21,6 @@ requests==2.31.0
 httpx==0.25.1
 aiofiles==23.2.1
 
-# Development
-pytest==7.4.3
-pytest-asyncio==0.21.1
-black==23.11.0
+# Development (puede no ser necesario en producción)
+# pytest==7.4.3
+# black==23.11.0
