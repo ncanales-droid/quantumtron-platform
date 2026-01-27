@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     """Application settings with environment variable support."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env.local", ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -62,5 +62,22 @@ class Settings(BaseSettings):
         description="Random seed for reproducible statistical analysis"
     )
 
+    # DeepSeek AI Configuration
+    DEEPSEEK_API_KEY: str = Field(
+        default="",
+        description="API Key for DeepSeek AI service"
+    )
+    DEEPSEEK_MODEL: str = Field(
+        default="deepseek-chat",
+        description="DeepSeek model to use"
+    )
+    DEEPSEEK_BASE_URL: str = Field(
+        default="https://api.deepseek.com/v1",
+        description="DeepSeek API base URL"
+    )
+    DEEPSEEK_MAX_TOKENS: int = Field(
+        default=2000,
+        description="Maximum tokens for DeepSeek responses"
+    )
 
 settings = Settings()

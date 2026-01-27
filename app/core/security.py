@@ -15,6 +15,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # HTTP Bearer authentication
 security = HTTPBearer()
 
+# Lovable testing token - use this in Lovable UI
+LOVABLE_TEST_TOKEN = "lovable-test-token-12345"
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
@@ -94,7 +97,7 @@ async def get_optional_user(
     Get current user if authenticated, otherwise return None.
     
     This is the 'optional' version that doesn't require authentication.
-    For testing, returns a mock user if token is provided.
+    Accepts special Lovable test token for development.
 
     Args:
         credentials: Optional HTTP authorization credentials
@@ -105,9 +108,29 @@ async def get_optional_user(
     if not credentials:
         return None
     
+    token = credentials.credentials
+    
+    # SPECIAL CASE: Accept Lovable test token for development
+    if token == LOVABLE_TEST_TOKEN:
+        return {
+            "id": 999,
+            "username": "lovable_user",
+            "email": "lovable@example.com",
+            "source": "lovable_test_token"
+        }
+    
+    # SPECIAL CASE: Accept any token starting with "test-" for testing
+    if token.startswith("test-"):
+        return {
+            "id": 1,
+            "username": f"test_user_{hash(token) % 1000}",
+            "email": f"test{hash(token) % 1000}@example.com",
+            "source": "test_token"
+        }
+    
     try:
-        # Decode the token
-        payload = decode_access_token(credentials.credentials)
+        # Decode the actual JWT token
+        payload = decode_access_token(token)
         if not payload:
             return None
         
@@ -123,7 +146,8 @@ async def get_optional_user(
             "id": user_id,
             "username": username or f"user_{user_id}",
             "email": email or f"user_{user_id}@example.com",
-            "token_payload": payload
+            "token_payload": payload,
+            "source": "jwt_token"
         }
     except Exception:
         # If any error occurs during validation, return None
@@ -137,6 +161,7 @@ async def get_current_user(
     Get current user (requires authentication).
     
     Raises HTTPException if not authenticated.
+    Accepts Lovable test token for development.
 
     Args:
         credentials: HTTP authorization credentials
@@ -151,7 +176,30 @@ async def get_current_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Could not validate credentials. For Lovable testing, use token: 'lovable-test-token-12345'",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+def create_lovable_test_token() -> str:
+    """
+    Create a test token for Lovable development.
+    
+    Returns:
+        str: Lovable test token
+    """
+    return LOVABLE_TEST_TOKEN
+
+
+def is_lovable_test_token(token: str) -> bool:
+    """
+    Check if token is the Lovable test token.
+    
+    Args:
+        token: Token to check
+        
+    Returns:
+        bool: True if token is Lovable test token
+    """
+    return token == LOVABLE_TEST_TOKEN
