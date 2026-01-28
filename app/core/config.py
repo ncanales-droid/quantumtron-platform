@@ -1,3 +1,9 @@
+﻿import os
+
+# Railway-safe DB location (container writable path)
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    os.environ["DATABASE_URL"] = os.getenv("DATABASE_URL", "sqlite:////app/data/quantumtron.db")
+
 """Application configuration using pydantic-settings."""
 
 import os
@@ -81,3 +87,4 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+
