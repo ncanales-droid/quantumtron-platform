@@ -36,7 +36,15 @@ try:
     
     app = FastAPI()
     
-    @app.get("/")
+    
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)@app.get("/")
     def root():
         return {
             "status": "ok", 
@@ -63,4 +71,5 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     sys.exit(1)
+
 
