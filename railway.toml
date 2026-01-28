@@ -1,5 +1,5 @@
 ﻿[build]
-builder = "nixpacks"
+builder = "dockerfile"
 
-[build.environment]
-PYTHON_VERSION = "3.11"
+[deploy]
+restartPolicyType = "on_failure"
