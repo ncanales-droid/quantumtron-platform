@@ -1,10 +1,9 @@
-﻿from fastapi import FastAPI
+﻿from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
 app = FastAPI()
 
-# CORS for Lovable and dashboard
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,6 +22,17 @@ def health():
 @app.get("/lovable-health")
 def lovable_health():
     return {"ok": True, "service": "quantumtron"}
+
+# ✅ Endpoint esperado por Lovable
+@app.post("/api/v1/diagnostics/upload")
+async def diagnostics_upload(file: UploadFile = File(...)):
+    content = await file.read()
+    return {
+        "ok": True,
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "bytes": len(content)
+    }
 
 if __name__ == "__main__":
     import uvicorn
