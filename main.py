@@ -1,75 +1,30 @@
-﻿#!/usr/bin/env python3
-"""
-QuantumTron Platform - DEBUG RUTAS
-"""
-import os
-import sys
-
-print("=" * 60)
-print("🚀 DEBUG - INICIANDO")
-print("=" * 60)
-
-# Información de rutas
-print(f"📁 Directorio actual: {os.getcwd()}")
-print(f"📄 Archivos en directorio actual:")
-for f in os.listdir('.'):
-    print(f"   - {f}")
-
-print(f"🐍 Python path: {sys.path}")
-print(f"📦 Python version: {sys.version}")
-
-# Verificar si estamos en /app
-if os.getcwd() == '/app':
-    print("✅ Estamos en /app")
-else:
-    print(f"📍 Estamos en: {os.getcwd()}")
-    print("💡 Intentando cambiar a /app...")
-    try:
-        os.chdir('/app')
-        print(f"✅ Cambiado a: {os.getcwd()}")
-    except:
-        print("⚠️  No se pudo cambiar a /app")
-
-try:
-    from fastapi import FastAPI
-    import uvicorn
-    
-    app = FastAPI()
-    
-    
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
+app = FastAPI()
+
+# CORS for Lovable and dashboard
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-)@app.get("/")
-    def root():
-        return {
-            "status": "ok", 
-            "app": "quantumtron",
-            "cwd": os.getcwd(),
-            "port": os.getenv("PORT", "8000")
-        }
-    
-    @app.get("/health")
-    def health():
-        return {"status": "healthy", "debug": True}
-    @app.get("/lovable-health")
-    def lovable_health():
-        return {"ok": True, "service": "quantumtron"}
+)
 
-    
-    if __name__ == "__main__":
-        port = int(os.getenv("PORT", "8000"))
-        print(f"🎯 Iniciando uvicorn en 0.0.0.0:{port}")
-        uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
-        
-except Exception as e:
-    print(f"❌ ERROR: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "quantumtron"}
 
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
 
+@app.get("/lovable-health")
+def lovable_health():
+    return {"ok": True, "service": "quantumtron"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
