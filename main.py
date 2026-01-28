@@ -48,6 +48,10 @@ try:
     @app.get("/health")
     def health():
         return {"status": "healthy", "debug": True}
+    @app.get("/lovable-health")
+    def lovable_health():
+        return {"ok": True, "service": "quantumtron"}
+
     
     if __name__ == "__main__":
         port = int(os.getenv("PORT", "8000"))
@@ -59,3 +63,4 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     sys.exit(1)
+
