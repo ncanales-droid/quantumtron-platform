@@ -31,7 +31,7 @@ from app.api.deps import (
 # Importar base de datos
 from app.db_simple import florence_db
 
-router = APIRouter(prefix="/florence", tags=["florence"])
+router = APIRouter(prefix="/api/v1/florence", tags=["florence"])
 
 @router.get("/health", response_model=Dict[str, Any])
 async def health_check():
