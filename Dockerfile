@@ -17,5 +17,4 @@ COPY ./main.py /app/main.py
 
 EXPOSE 8080
 
-# 🔎 CMD con diagnóstico para que Railway SIEMPRE imprima qué pasa
-CMD ["sh", "-c", "set -ex; echo \"PORT=$PORT\"; pwd; ls -la; python -c \"import sys; print(sys.version)\"; python -c \"import main; print('main imported OK'); print(main.app)\"; uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --log-level debug"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --log-level info"]

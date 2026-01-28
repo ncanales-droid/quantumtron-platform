@@ -1,18 +1,12 @@
 ﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Routers (según tu estructura)
 from app.api.endpoints.health import router as health_router
 from app.api.endpoints.diagnostics import router as diagnostics_router
 from app.api.endpoints.ml_unified import router as ml_router
-import os
-DISABLE_FLORENCE_ON_STARTUP = os.getenv("DISABLE_FLORENCE_ON_STARTUP", "").lower() in ("1","true","yes")
-if not DISABLE_FLORENCE_ON_STARTUP:
-    from app.api.endpoints.florence import router as florence_router
 
 app = FastAPI(title="QuantumTron Intelligence Platform API")
 
-# CORS for Lovable
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,19 +14,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount routers
+# API v1
 app.include_router(health_router, prefix="/api/v1/diagnostics", tags=["diagnostics"])
 app.include_router(diagnostics_router, prefix="/api/v1/diagnostics", tags=["diagnostics"])
 app.include_router(ml_router, prefix="/api/v1/ml", tags=["ml"])
-if not DISABLE_FLORENCE_ON_STARTUP:
-    app.include_router(florence_router, prefix="/api/v1/florence", tags=["florence"])
 
-# Convenience endpoints
-@app.get("/health")
-def health():
-    return {"status": "healthy", "service": "quantumtron"}
-
+# Lovable health (raíz)
 @app.get("/lovable-health")
 def lovable_health():
     return {"ok": True, "service": "quantumtron"}
 
+@app.get("/health")
+def health():
+    return {"status": "healthy", "service": "quantumtron"}
