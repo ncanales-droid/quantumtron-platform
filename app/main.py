@@ -1,11 +1,17 @@
 ﻿# ========== LOVABLE TRAINING ENDPOINT (REAL) ==========
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import (
+    mean_squared_error,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+)
 import pandas as pd
 import numpy as np
 import joblib
 import os
-import time  # ✅ IMPORTANTE
+import time  # (puede quedarse, pero NO dependemos de este import)
 
 @lovable_router.post("/train")
 async def lovable_train(request: dict):
@@ -16,13 +22,17 @@ async def lovable_train(request: dict):
     ✅ Respuesta Lovable-friendly:
     - run_id estable (run_<timestamp>_<rand>)
     - métricas planas (accuracy/precision/recall/f1_score)
-    - para regresión: rmse/r2_score/mse (y también dejamos accuracy/precision/recall/f1_score en 0.0)
+    - para regresión: rmse/r2_score/mse (y accuracy/precision/recall/f1_score en 0.0)
     - model_saved + mlflow_registered
-    """
 
+    🔥 Hotfix: import time dentro de la función (evita NameError en Render)
+    """
     logger.info("Lovable REAL training request received")
 
     try:
+        # 🔥 HOTFIX DEFINITIVO: no dependemos del import global
+        import time as _time
+
         # 1) Leer payload
         algorithm = request.get("algorithm", "gradientboostingregressor")
         training_data = request.get("data", [])
@@ -35,8 +45,8 @@ async def lovable_train(request: dict):
                 "required_format": {
                     "algorithm": "gradientboostingregressor|randomforestregressor|linearregression|logisticregression|svm|xgboost",
                     "data": "[{feature1: value1, feature2: value2, ... target: value}]",
-                    "target": "name_of_target_column"
-                }
+                    "target": "name_of_target_column",
+                },
             }
 
         # 2) DataFrame
@@ -47,7 +57,7 @@ async def lovable_train(request: dict):
             return {
                 "success": False,
                 "error": f"Target column '{target_column}' not found in data",
-                "available_columns": list(df.columns)
+                "available_columns": list(df.columns),
             }
 
         # 4) Limpieza básica: quitar filas con NaN en target
@@ -56,7 +66,7 @@ async def lovable_train(request: dict):
             return {
                 "success": False,
                 "error": "Not enough valid rows after cleaning. Need at least 5 rows.",
-                "rows_after_cleaning": int(len(df))
+                "rows_after_cleaning": int(len(df)),
             }
 
         X = df.drop(columns=[target_column])
@@ -100,10 +110,13 @@ async def lovable_train(request: dict):
                 "success": False,
                 "error": f"Algorithm '{algorithm}' not supported",
                 "supported_algorithms": [
-                    "gradientboostingregressor", "randomforestregressor",
-                    "linearregression", "logisticregression",
-                    "svm", "xgboost"
-                ]
+                    "gradientboostingregressor",
+                    "randomforestregressor",
+                    "linearregression",
+                    "logisticregression",
+                    "svm",
+                    "xgboost",
+                ],
             }
 
         # 7) Entrenar
@@ -126,47 +139,52 @@ async def lovable_train(request: dict):
             rmse = float(np.sqrt(mse))
             r2 = float(model.score(X_test, y_test))
 
-            metrics = {
-                "mse": float(mse),
-                "rmse": rmse,
-                "r2_score": r2
-            }
+            metrics = {"mse": float(mse), "rmse": rmse, "r2_score": r2}
 
         else:
-            # Asegurar predicciones como clases 0/1 (LogisticRegression ya lo hace)
-            # Por si viene como float o string:
+            # Asegurar predicciones como clases 0/1
             try:
                 y_pred_cls = np.array(y_pred, dtype=int)
             except Exception:
-                y_pred_cls = np.array([1 if float(v) >= 0.5 else 0 for v in y_pred], dtype=int)
+                y_pred_cls = np.array(
+                    [1 if float(v) >= 0.5 else 0 for v in y_pred], dtype=int
+                )
 
             try:
                 y_true_cls = np.array(y_test, dtype=int)
             except Exception:
                 y_true_cls = np.array([int(v) for v in y_test], dtype=int)
 
-            # métricas reales (macro/weighted depende tu gusto; aquí binary/auto)
             flat_accuracy = float(accuracy_score(y_true_cls, y_pred_cls))
 
-            # Si es binario 0/1, average='binary' funciona; si no, fallback a 'macro'
             average_mode = "binary"
             unique_vals = np.unique(y_true_cls)
             if len(unique_vals) > 2:
                 average_mode = "macro"
 
-            flat_precision = float(precision_score(y_true_cls, y_pred_cls, average=average_mode, zero_division=0))
-            flat_recall = float(recall_score(y_true_cls, y_pred_cls, average=average_mode, zero_division=0))
-            flat_f1 = float(f1_score(y_true_cls, y_pred_cls, average=average_mode, zero_division=0))
+            flat_precision = float(
+                precision_score(
+                    y_true_cls, y_pred_cls, average=average_mode, zero_division=0
+                )
+            )
+            flat_recall = float(
+                recall_score(
+                    y_true_cls, y_pred_cls, average=average_mode, zero_division=0
+                )
+            )
+            flat_f1 = float(
+                f1_score(y_true_cls, y_pred_cls, average=average_mode, zero_division=0)
+            )
 
             metrics = {
                 "accuracy": flat_accuracy,
                 "precision": flat_precision,
                 "recall": flat_recall,
-                "f1_score": flat_f1
+                "f1_score": flat_f1,
             }
 
         # 9) Guardar modelo
-        run_id = f"run_{int(time.time())}_{np.random.randint(1000,9999)}"
+        run_id = f"run_{int(_time.time())}_{np.random.randint(1000,9999)}"
         os.makedirs("data/models", exist_ok=True)
         model_filename = f"data/models/{run_id}.joblib"
         joblib.dump(model, model_filename)
@@ -175,6 +193,7 @@ async def lovable_train(request: dict):
         mlflow_registered = False
         try:
             import mlflow
+
             mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
 
             with mlflow.start_run(run_name=run_id):
@@ -188,7 +207,6 @@ async def lovable_train(request: dict):
                     if v is not None:
                         mlflow.log_metric(k, float(v))
 
-                # Log model
                 mlflow.sklearn.log_model(model, "model")
                 mlflow_registered = True
 
@@ -201,11 +219,11 @@ async def lovable_train(request: dict):
 
             # Identificadores
             "run_id": run_id,
-            "model_id": run_id,  # compat: algunos frontends usan model_id
+            "model_id": run_id,  # compat
             "algorithm": algorithm,
             "model_type": model_type,
 
-            # Métricas planas (Lovable las pinta directo)
+            # Métricas planas
             "accuracy": float(flat_accuracy),
             "precision": float(flat_precision),
             "recall": float(flat_recall),
@@ -226,13 +244,9 @@ async def lovable_train(request: dict):
             # Debug/compat
             "metrics": metrics,
             "model_saved": model_filename,
-            "mlflow_registered": mlflow_registered
+            "mlflow_registered": mlflow_registered,
         }
 
     except Exception as e:
         logger.error(f"Training error: {e}", exc_info=True)
-        return {
-            "success": False,
-            "error": str(e),
-            "error_type": type(e).__name__
-        }
+        return {"success": False, "error": str(e), "error_type": type(e).__name__}
