@@ -125,3 +125,91 @@ async def shutdown_event():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+# ========== LOVABLE COMPATIBILITY ENDPOINTS ==========
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Dict, Any
+
+lovable_router = APIRouter(prefix="/api/models", tags=["lovable-compatibility"])
+
+# Modelo para predicciones de Lovable
+class LovablePredictionRequest(BaseModel):
+    data: Dict[str, Any]
+    model_id: str = None
+
+# Mapeo de modelos Lovable -> QuantumTron
+LOVABLE_MODEL_MAPPING = {
+    "gradientboostingregressor": "quantum-predictor",
+    "randomforestregressor": "diagnostic-model",
+    "linearmodel": "quantum-predictor",
+    "gradient_boosting": "quantum-predictor",
+    "random_forest": "diagnostic-model"
+}
+
+@lovable_router.post("/{model_id}/predict")
+async def lovable_predict(model_id: str, request: LovablePredictionRequest):
+    """
+    Endpoint compatible con Lovable para predicciones.
+    Lovable envía: POST /api/models/{model_id}/predict
+    """
+    
+    # Log para debugging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Lovable request - Model: {model_id}, Data: {request.data}")
+    
+    # Mapear el model_id de Lovable a tu sistema
+    model_id_lower = model_id.lower()
+    quantumtron_model = LOVABLE_MODEL_MAPPING.get(model_id_lower, "quantum-predictor")
+    
+    # Preparar respuesta compatible
+    return {
+        "success": True,
+        "model": model_id,
+        "mapped_to": quantumtron_model,
+        "prediction": {
+            "value": 0.85,  # Valor de ejemplo
+            "confidence": 0.92
+        },
+        "metadata": {
+            "api_version": "1.0.0",
+            "endpoint": "lovable-compatibility",
+            "original_data": request.data
+        }
+    }
+
+@lovable_router.get("/{model_id}/info")
+async def model_info(model_id: str):
+    """Información del modelo para Lovable."""
+    return {
+        "model_id": model_id,
+        "name": f"QuantumTron {model_id}",
+        "type": "regression",
+        "status": "active",
+        "features": ["feature1", "feature2", "feature3"],
+        "api_compatible": True
+    }
+
+@lovable_router.get("/")
+async def list_lovable_models():
+    """Listar modelos para Lovable."""
+    return {
+        "models": [
+            {
+                "id": "gradientboostingregressor",
+                "name": "Gradient Boosting Regressor",
+                "type": "regression",
+                "status": "ready"
+            },
+            {
+                "id": "randomforestregressor",
+                "name": "Random Forest Regressor",
+                "type": "regression",
+                "status": "ready"
+            }
+        ]
+    }
+
+# Incluir el router en la app
+app.include_router(lovable_router)
