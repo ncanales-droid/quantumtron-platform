@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 import pandas as pd
 import io
 from datetime import datetime
+import inspect  # ← NUEVO IMPORT
 
 from app.api.dependencies import get_database_session, get_optional_user
 from app.services.ml_models.model_registry import model_registry
@@ -94,16 +95,45 @@ async def train_ml_model(
         test_size: Proportion for test set
         random_state: Random seed
     """
+    # ========== DEBUG AÑADIDO ==========
+    print(f"\n" + "="*50)
+    print(f"🔍 DEBUG TRAIN ENDPOINT ACTIVADO")
+    print(f"="*50)
+    print(f"📝 Parámetros recibidos:")
+    print(f"   model_name: {model_name}")
+    print(f"   target_column: '{target_column}' (type: {type(target_column)})")
+    print(f"   task_type: {task_type}")
+    print(f"   test_size: {test_size}")
+    print(f"   file.filename: {file.filename}")
+    print(f"   file.content_type: {file.content_type}")
+    
+    # Leer headers/form data para debug
+    frame = inspect.currentframe()
+    args, _, _, values = inspect.getargvalues(frame)
+    print(f"\n📋 Todos los parámetros:")
+    for arg in args:
+        if arg not in ['db', 'current_user']:
+            print(f"   {arg}: {values[arg]}")
+    # ========== FIN DEBUG ==========
+    
     try:
         # Read file
         if file.content_type not in ['text/csv', 'application/vnd.ms-excel']:
+            print(f"❌ ERROR: content_type no válido: {file.content_type}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Only CSV files are supported"
             )
         
+        print(f"✅ Content-type válido: {file.content_type}")
+        
         contents = await file.read()
         df = pd.read_csv(io.BytesIO(contents))
+        
+        print(f"✅ CSV leído. Shape: {df.shape}")
+        print(f"   Columnas: {list(df.columns)}")
+        print(f"   Primeras filas:")
+        print(df.head().to_string())
         
         if df.empty:
             raise HTTPException(
@@ -113,6 +143,10 @@ async def train_ml_model(
         
         # Auto-detect task type if not specified
         if task_type == "auto" and target_column:
+            print(f"\n🔍 Auto-detectando task_type...")
+            print(f"   target_column dtype: {df[target_column].dtype}")
+            print(f"   Valores únicos en target: {df[target_column].nunique()}")
+            
             if df[target_column].dtype in ['int64', 'float64']:
                 unique_values = df[target_column].nunique()
                 if unique_values <= 10 and unique_values < len(df) * 0.1:
@@ -121,7 +155,10 @@ async def train_ml_model(
                     task_type = "regression"
             else:
                 task_type = "classification"
+                
+            print(f"   Task_type detectado: {task_type}")
         elif not target_column:
+            print(f"❌ ERROR: target_column es None o vacío")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="target_column is required for supervised learning"
@@ -129,20 +166,27 @@ async def train_ml_model(
         
         # Validate model exists
         if model_name not in model_registry.get_available_models():
+            print(f"❌ ERROR: Modelo '{model_name}' no encontrado")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Model '{model_name}' not found. Available: {model_registry.get_available_models()}"
             )
         
+        print(f"✅ Modelo '{model_name}' encontrado")
+        
         # Validate target column exists
         if target_column not in df.columns:
+            print(f"❌ ERROR: Columna '{target_column}' no encontrada en datos")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Target column '{target_column}' not found in data"
             )
         
+        print(f"✅ Columna target '{target_column}' encontrada")
+        
         # Get model service
         service = model_registry.create_service(model_name)
+        print(f"✅ Servicio creado: {type(service).__name__}")
         
         # Prepare training parameters
         params = {
@@ -154,25 +198,39 @@ async def train_ml_model(
             'model_name': f"{model_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         }
         
+        print(f"📊 Parámetros de entrenamiento:")
+        for key, value in params.items():
+            if key != 'df':
+                print(f"   {key}: {value}")
+        
         # Add model-specific parameters
         if model_name == 'random_forest':
             params['n_estimators'] = 100
             params['max_depth'] = None
+            print(f"   n_estimators: 100 (default)")
         
         # Train model
+        print(f"\n🚀 Iniciando entrenamiento...")
         result = await service.train(**params)
         
         if result['status'] == 'error':
+            print(f"❌ ERROR en entrenamiento: {result['error']}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=result['error']
             )
+        
+        print(f"✅ Entrenamiento completado exitosamente!")
+        print(f"📈 Resultado: model_id={result.get('model_id')}")
         
         return result
         
     except HTTPException:
         raise
     except Exception as e:
+        print(f"❌ EXCEPCIÓN NO CONTROLADA: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error training {model_name}: {str(e)}"
