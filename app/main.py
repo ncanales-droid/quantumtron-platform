@@ -126,25 +126,123 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
+
 # ========== LOVABLE COMPATIBILITY ENDPOINTS ==========
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Any
+import logging
 
 lovable_router = APIRouter(prefix="/api/models", tags=["lovable-compatibility"])
+logger = logging.getLogger(__name__)
 
 # Modelo para predicciones de Lovable
 class LovablePredictionRequest(BaseModel):
     data: Dict[str, Any]
     model_id: str = None
 
-# Mapeo de modelos Lovable -> QuantumTron
+# MAPEO COMPLETO de modelos Lovable -> QuantumTron
 LOVABLE_MODEL_MAPPING = {
-    "gradientboostingregressor": "quantum-predictor",
-    "randomforestregressor": "diagnostic-model",
-    "linearmodel": "quantum-predictor",
-    "gradient_boosting": "quantum-predictor",
-    "random_forest": "diagnostic-model"
+    # Regresión
+    "gradientboostingregressor": "gradient_boosting",
+    "gradientboosting": "gradient_boosting",
+    "gbm": "gradient_boosting",
+    
+    "randomforestregressor": "random_forest", 
+    "randomforest": "random_forest",
+    "rf": "random_forest",
+    
+    "linearregression": "linear_regression",
+    "linear": "linear_regression",
+    "lr": "linear_regression",
+    
+    "xgboostregressor": "xgboost",
+    "xgboost": "xgboost",
+    "xgb": "xgboost",
+    
+    "svmregressor": "svm",
+    "supportvectormachine": "svm",
+    "svr": "svm",
+    
+    # Clasificación
+    "logisticregression": "logistic_regression",
+    "logistic": "logistic_regression",
+    "logit": "logistic_regression",
+    
+    "randomforestclassifier": "random_forest_classifier",
+    "rfc": "random_forest_classifier",
+    
+    "gradientboostingclassifier": "gradient_boosting_classifier",
+    "gbc": "gradient_boosting_classifier",
+    
+    "svmclassifier": "svm_classifier",
+    "svc": "svm_classifier"
+}
+
+# Información detallada de cada modelo
+MODEL_INFO = {
+    "gradient_boosting": {
+        "name": "Gradient Boosting Regressor",
+        "type": "regression",
+        "description": "Ensemble de árboles de decisión con boosting",
+        "features": ["feature1", "feature2", "feature3", "feature4"],
+        "hyperparameters": {
+            "n_estimators": 100,
+            "learning_rate": 0.1,
+            "max_depth": 3
+        }
+    },
+    "random_forest": {
+        "name": "Random Forest Regressor",
+        "type": "regression", 
+        "description": "Ensemble de múltiples árboles de decisión",
+        "features": ["feature1", "feature2", "feature3"],
+        "hyperparameters": {
+            "n_estimators": 100,
+            "max_depth": 10
+        }
+    },
+    "linear_regression": {
+        "name": "Linear Regression",
+        "type": "regression",
+        "description": "Modelo lineal para regresión",
+        "features": ["feature1", "feature2", "feature3"],
+        "hyperparameters": {
+            "fit_intercept": True,
+            "normalize": False
+        }
+    },
+    "svm": {
+        "name": "Support Vector Machine Regressor",
+        "type": "regression",
+        "description": "SVM para problemas de regresión",
+        "features": ["feature1", "feature2", "feature3"],
+        "hyperparameters": {
+            "kernel": "rbf",
+            "C": 1.0
+        }
+    },
+    "xgboost": {
+        "name": "XGBoost Regressor",
+        "type": "regression",
+        "description": "Optimized gradient boosting library",
+        "features": ["feature1", "feature2", "feature3", "feature4"],
+        "hyperparameters": {
+            "n_estimators": 100,
+            "max_depth": 6,
+            "learning_rate": 0.3
+        }
+    },
+    "logistic_regression": {
+        "name": "Logistic Regression Classifier",
+        "type": "classification",
+        "description": "Modelo lineal para clasificación binaria",
+        "features": ["feature1", "feature2", "feature3"],
+        "hyperparameters": {
+            "C": 1.0,
+            "penalty": "l2"
+        }
+    }
 }
 
 @lovable_router.post("/{model_id}/predict")
@@ -155,61 +253,107 @@ async def lovable_predict(model_id: str, request: LovablePredictionRequest):
     """
     
     # Log para debugging
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"Lovable request - Model: {model_id}, Data: {request.data}")
+    logger.info(f"Lovable request - Model: {model_id}, Data keys: {list(request.data.keys())}")
     
     # Mapear el model_id de Lovable a tu sistema
-    model_id_lower = model_id.lower()
-    quantumtron_model = LOVABLE_MODEL_MAPPING.get(model_id_lower, "quantum-predictor")
+    model_id_lower = model_id.lower().replace(" ", "").replace("-", "")
+    quantumtron_model = LOVABLE_MODEL_MAPPING.get(model_id_lower, "gradient_boosting")
+    
+    # Obtener info del modelo
+    model_info = MODEL_INFO.get(quantumtron_model, MODEL_INFO["gradient_boosting"])
+    
+    # Generar predicción basada en el modelo (simulación por ahora)
+    import random
+    if model_info["type"] == "regression":
+        prediction_value = round(random.uniform(0.5, 1.0), 3)
+    else:  # classification
+        prediction_value = random.choice([0, 1])
     
     # Preparar respuesta compatible
     return {
         "success": True,
-        "model": model_id,
-        "mapped_to": quantumtron_model,
+        "model": {
+            "id": model_id,
+            "name": model_info["name"],
+            "type": model_info["type"],
+            "mapped_to": quantumtron_model
+        },
         "prediction": {
-            "value": 0.85,  # Valor de ejemplo
-            "confidence": 0.92
+            "value": prediction_value,
+            "confidence": round(random.uniform(0.85, 0.98), 3),
+            "type": model_info["type"]
+        },
+        "input_features": {
+            "received": request.data,
+            "expected": model_info["features"]
         },
         "metadata": {
             "api_version": "1.0.0",
-            "endpoint": "lovable-compatibility",
-            "original_data": request.data
+            "timestamp": "2024-01-30T00:00:00Z",
+            "model_info": model_info
         }
     }
 
 @lovable_router.get("/{model_id}/info")
 async def model_info(model_id: str):
     """Información del modelo para Lovable."""
+    
+    model_id_lower = model_id.lower().replace(" ", "").replace("-", "")
+    quantumtron_model = LOVABLE_MODEL_MAPPING.get(model_id_lower, "gradient_boosting")
+    info = MODEL_INFO.get(quantumtron_model, MODEL_INFO["gradient_boosting"])
+    
     return {
         "model_id": model_id,
-        "name": f"QuantumTron {model_id}",
-        "type": "regression",
+        "quantumtron_id": quantumtron_model,
+        "name": info["name"],
+        "type": info["type"],
+        "description": info["description"],
         "status": "active",
-        "features": ["feature1", "feature2", "feature3"],
-        "api_compatible": True
+        "features": info["features"],
+        "hyperparameters": info["hyperparameters"],
+        "api_compatible": True,
+        "endpoints": {
+            "predict": f"/api/models/{model_id}/predict",
+            "info": f"/api/models/{model_id}/info"
+        }
     }
 
 @lovable_router.get("/")
 async def list_lovable_models():
-    """Listar modelos para Lovable."""
+    """Listar TODOS los modelos disponibles para Lovable."""
+    
+    models_list = []
+    
+    # Agregar todos los modelos del mapeo
+    for lovable_id, quantumtron_id in LOVABLE_MODEL_MAPPING.items():
+        if quantumtron_id in MODEL_INFO:
+            info = MODEL_INFO[quantumtron_id]
+            
+            # Solo agregar una vez por quantumtron_id (evitar duplicados)
+            if not any(m["quantumtron_id"] == quantumtron_id for m in models_list):
+                models_list.append({
+                    "id": lovable_id,
+                    "quantumtron_id": quantumtron_id,
+                    "name": info["name"],
+                    "type": info["type"],
+                    "description": info["description"],
+                    "status": "ready",
+                    "endpoint": f"/api/models/{lovable_id}/predict"
+                })
+    
+    # Ordenar por tipo y nombre
+    models_list = sorted(models_list, key=lambda x: (x["type"], x["name"]))
+    
     return {
-        "models": [
-            {
-                "id": "gradientboostingregressor",
-                "name": "Gradient Boosting Regressor",
-                "type": "regression",
-                "status": "ready"
-            },
-            {
-                "id": "randomforestregressor",
-                "name": "Random Forest Regressor",
-                "type": "regression",
-                "status": "ready"
-            }
-        ]
+        "models": models_list,
+        "count": len(models_list),
+        "types": {
+            "regression": len([m for m in models_list if m["type"] == "regression"]),
+            "classification": len([m for m in models_list if m["type"] == "classification"])
+        },
+        "api_version": "1.0.0"
     }
 
 # Incluir el router en la app
 app.include_router(lovable_router)
+
