@@ -1,6 +1,6 @@
 ﻿# ========== LOVABLE TRAINING ENDPOINT (REAL) ==========
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, accuracy_score
+from sklearn.metrics import mean_squared_error, accuracy_score, precision_score, recall_score, f1_score
 import pandas as pd
 import numpy as np
 import joblib
@@ -13,10 +13,11 @@ async def lovable_train(request: dict):
     Endpoint REAL de training para Lovable.
     Entrena un modelo con datos proporcionados.
 
-    🔥 Respuesta "Lovable-friendly":
+    ✅ Respuesta Lovable-friendly:
+    - run_id estable (run_<timestamp>_<rand>)
     - métricas planas (accuracy/precision/recall/f1_score)
-    - también rmse/r2_score para regresión
-    - run_id para que Lovable lo guarde y lo use en Results/History
+    - para regresión: rmse/r2_score/mse (y también dejamos accuracy/precision/recall/f1_score en 0.0)
+    - model_saved + mlflow_registered
     """
 
     logger.info("Lovable REAL training request received")
@@ -49,21 +50,30 @@ async def lovable_train(request: dict):
                 "available_columns": list(df.columns)
             }
 
+        # 4) Limpieza básica: quitar filas con NaN en target
+        df = df.dropna(subset=[target_column])
+        if len(df) < 5:
+            return {
+                "success": False,
+                "error": "Not enough valid rows after cleaning. Need at least 5 rows.",
+                "rows_after_cleaning": int(len(df))
+            }
+
         X = df.drop(columns=[target_column])
         y = df[target_column]
 
-        # 4) Split train/test
+        # 5) Split train/test
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
         )
 
-        # 5) Seleccionar modelo
+        # 6) Seleccionar modelo
         from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
         from sklearn.linear_model import LinearRegression, LogisticRegression
         from sklearn.svm import SVR
         import xgboost as xgb
 
-        algo = algorithm.lower().replace(" ", "").replace("-", "")
+        algo = str(algorithm).lower().replace(" ", "").replace("-", "")
         model = None
         model_type = "regression"
 
@@ -77,7 +87,7 @@ async def lovable_train(request: dict):
             model = LinearRegression()
             model_type = "regression"
         elif algo in ["logisticregression", "logistic", "logit"]:
-            model = LogisticRegression(random_state=42, max_iter=1000)
+            model = LogisticRegression(random_state=42, max_iter=2000)
             model_type = "classification"
         elif algo in ["svm", "svr", "supportvectormachine"]:
             model = SVR()
@@ -96,108 +106,128 @@ async def lovable_train(request: dict):
                 ]
             }
 
-        # 6) Entrenar
+        # 7) Entrenar
         logger.info(f"Training {algorithm} with {len(X_train)} samples...")
         model.fit(X_train, y_train)
 
-        # 7) Evaluar
+        # 8) Evaluar
         y_pred = model.predict(X_test)
 
+        # Defaults "planos" (Lovable los renderiza directo)
+        flat_accuracy = 0.0
+        flat_precision = 0.0
+        flat_recall = 0.0
+        flat_f1 = 0.0
+
         metrics = {}
+
         if model_type == "regression":
             mse = mean_squared_error(y_test, y_pred)
             rmse = float(np.sqrt(mse))
             r2 = float(model.score(X_test, y_test))
-            metrics = {"mse": float(mse), "rmse": rmse, "r2_score": r2}
 
-            # Para que Lovable no pinte 0.0 en accuracy/precision/recall/f1
-            # (Lovable a veces espera estos campos aunque sea regresión)
-            flat_accuracy = None
-            flat_precision = None
-            flat_recall = None
-            flat_f1 = None
-
-        else:
-            # Nota: LogisticRegression devuelve clases 0/1, OK
-            accuracy = float(accuracy_score(y_test, y_pred))
-            # (Aquí dejamos precision/recall/f1 “placeholder” si no estás calculando real)
             metrics = {
-                "accuracy": accuracy,
-                "precision": float(0.85),
-                "recall": float(0.82),
-                "f1_score": float(0.83)
+                "mse": float(mse),
+                "rmse": rmse,
+                "r2_score": r2
             }
 
-            flat_accuracy = metrics["accuracy"]
-            flat_precision = metrics["precision"]
-            flat_recall = metrics["recall"]
-            flat_f1 = metrics["f1_score"]
+        else:
+            # Asegurar predicciones como clases 0/1 (LogisticRegression ya lo hace)
+            # Por si viene como float o string:
+            try:
+                y_pred_cls = np.array(y_pred, dtype=int)
+            except Exception:
+                y_pred_cls = np.array([1 if float(v) >= 0.5 else 0 for v in y_pred], dtype=int)
 
-        # 8) Guardar modelo
+            try:
+                y_true_cls = np.array(y_test, dtype=int)
+            except Exception:
+                y_true_cls = np.array([int(v) for v in y_test], dtype=int)
+
+            # métricas reales (macro/weighted depende tu gusto; aquí binary/auto)
+            flat_accuracy = float(accuracy_score(y_true_cls, y_pred_cls))
+
+            # Si es binario 0/1, average='binary' funciona; si no, fallback a 'macro'
+            average_mode = "binary"
+            unique_vals = np.unique(y_true_cls)
+            if len(unique_vals) > 2:
+                average_mode = "macro"
+
+            flat_precision = float(precision_score(y_true_cls, y_pred_cls, average=average_mode, zero_division=0))
+            flat_recall = float(recall_score(y_true_cls, y_pred_cls, average=average_mode, zero_division=0))
+            flat_f1 = float(f1_score(y_true_cls, y_pred_cls, average=average_mode, zero_division=0))
+
+            metrics = {
+                "accuracy": flat_accuracy,
+                "precision": flat_precision,
+                "recall": flat_recall,
+                "f1_score": flat_f1
+            }
+
+        # 9) Guardar modelo
         run_id = f"run_{int(time.time())}_{np.random.randint(1000,9999)}"
-        model_filename = f"data/models/{run_id}.joblib"
         os.makedirs("data/models", exist_ok=True)
+        model_filename = f"data/models/{run_id}.joblib"
         joblib.dump(model, model_filename)
 
-        # 9) Registrar en MLflow (opcional)
+        # 10) Registrar en MLflow (opcional)
         mlflow_registered = False
         try:
             import mlflow
-            mlflow.set_tracking_uri("http://localhost:5001")
+            mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
 
             with mlflow.start_run(run_name=run_id):
                 mlflow.log_param("algorithm", algorithm)
                 mlflow.log_param("model_type", model_type)
-                mlflow.log_param("dataset_size", len(df))
+                mlflow.log_param("dataset_size", int(len(df)))
                 mlflow.log_param("features", list(X.columns))
                 mlflow.log_param("target", target_column)
 
                 for k, v in metrics.items():
-                    mlflow.log_metric(k, float(v))
+                    if v is not None:
+                        mlflow.log_metric(k, float(v))
 
+                # Log model
                 mlflow.sklearn.log_model(model, "model")
                 mlflow_registered = True
 
         except Exception as mlflow_error:
             logger.warning(f"MLflow registration failed: {mlflow_error}")
 
-        # ✅ 10) RESPUESTA LOVABLE-FRIENDLY (MÉTRICAS PLANAS)
-        # Lovable suele renderizar accuracy/precision/recall/f1_score directamente.
-        # Por eso las ponemos al nivel raíz.
-        response = {
+        # ✅ 11) RESPUESTA LOVABLE-FRIENDLY (MÉTRICAS PLANAS + IDs)
+        return {
             "success": True,
 
             # Identificadores
             "run_id": run_id,
-            "model_id": run_id,
+            "model_id": run_id,  # compat: algunos frontends usan model_id
             "algorithm": algorithm,
             "model_type": model_type,
 
-            # Métricas PLANAS (clave para que Lovable deje 0.0)
-            "accuracy": flat_accuracy if flat_accuracy is not None else 0.0,
-            "precision": flat_precision if flat_precision is not None else 0.0,
-            "recall": flat_recall if flat_recall is not None else 0.0,
-            "f1_score": flat_f1 if flat_f1 is not None else 0.0,
+            # Métricas planas (Lovable las pinta directo)
+            "accuracy": float(flat_accuracy),
+            "precision": float(flat_precision),
+            "recall": float(flat_recall),
+            "f1_score": float(flat_f1),
 
             # Regresión (si aplica)
             "rmse": metrics.get("rmse"),
             "r2_score": metrics.get("r2_score"),
             "mse": metrics.get("mse"),
 
-            # Dataset info simple
+            # Dataset info
             "dataset_size": int(len(df)),
             "training_samples": int(len(X_train)),
             "test_samples": int(len(X_test)),
             "features": list(X.columns),
             "target": target_column,
 
-            # Debug/compat (por si tu UI aún usa esto)
+            # Debug/compat
             "metrics": metrics,
             "model_saved": model_filename,
             "mlflow_registered": mlflow_registered
         }
-
-        return response
 
     except Exception as e:
         logger.error(f"Training error: {e}", exc_info=True)
