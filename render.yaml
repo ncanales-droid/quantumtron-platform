@@ -1,0 +1,17 @@
+﻿# render.yaml - Configuración simplificada
+services:
+  # API Principal - Sin Dockerfile, build directo
+  - type: web
+    name: quantumtron-api
+    env: python
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    envVars:
+      - key: MLFLOW_TRACKING_URI
+        value: http://localhost:5001
+      - key: DEPLOYMENT_ENV
+        value: production
+    healthCheckPath: /health
+    autoDeploy: true
+    plan: free

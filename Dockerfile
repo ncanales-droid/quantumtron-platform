@@ -1,4 +1,4 @@
-﻿# Dockerfile
+﻿# Dockerfile corregido para Render
 FROM python:3.9-slim
 
 WORKDIR /app
@@ -8,25 +8,25 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copiar requirements PRIMERO (para cache de Docker)
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Copiar aplicación
-COPY . .
+# Copiar el resto de la aplicación
+COPY . /app
 
 # Variables de entorno
 ENV PYTHONPATH=/app
 ENV MLFLOW_TRACKING_URI=http://localhost:5001
 ENV FASTAPI_HOST=0.0.0.0
-ENV FASTAPI_PORT=8000
+ENV FASTAPI_PORT=${PORT:-8000}
 
-# Exponer puertos
-EXPOSE 8000 5001
+# Exponer puerto (Render usa $PORT)
+EXPOSE ${PORT:-8000}
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Health check simplificado
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Comando de inicio
-CMD ["sh", "-c", "mlflow server --host 0.0.0.0 --port 5001 --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns --serve-artifacts & sleep 5 && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Comando de inicio para Render
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1
