@@ -1,4 +1,49 @@
-﻿# ========== LOVABLE TRAINING ENDPOINT (REAL) ==========
+﻿# ========== IMPORTS Y CONFIGURACIÓN ==========
+from fastapi import FastAPI, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ========== CREAR ROUTERS (¡ESTO DEBE IR PRIMERO!) ==========
+# ¡CRÍTICO! Definir routers ANTES de usarlos en decoradores
+lovable_router = APIRouter(
+    prefix="/api/models",
+    tags=["lovable-compatibility", "models"]
+)
+
+# Router principal (si lo necesitas)
+main_router = APIRouter()
+
+# ========== CREAR APP ==========
+app = FastAPI(
+    title="QuantumTron API",
+    description="ML Platform for Lovable Integration",
+    version="2.0.0"
+)
+
+# ========== MIDDLEWARE ==========
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ========== ENDPOINTS BÁSICOS (opcional) ==========
+@app.get("/")
+async def root():
+    return {"message": "QuantumTron API v2.0"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "quantumtron-api"}
+
+# ========== LOVABLE TRAINING ENDPOINT (REAL) ==========
+# Los imports específicos pueden ir aquí (mejor práctica)
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     mean_squared_error,
@@ -11,7 +56,6 @@ import pandas as pd
 import numpy as np
 import joblib
 import os
-import time  # (puede quedarse, pero NO dependemos de este import)
 
 @lovable_router.post("/train")
 async def lovable_train(request: dict):
@@ -30,7 +74,7 @@ async def lovable_train(request: dict):
     logger.info("Lovable REAL training request received")
 
     try:
-        # 🔥 HOTFIX DEFINITIVO: no dependemos del import global
+        # 🔥 HOTFIX DEFINITIVO: import time DENTRO de la función
         import time as _time
 
         # 1) Leer payload
@@ -250,3 +294,14 @@ async def lovable_train(request: dict):
     except Exception as e:
         logger.error(f"Training error: {e}", exc_info=True)
         return {"success": False, "error": str(e), "error_type": type(e).__name__}
+
+# ========== REGISTRAR ROUTERS ==========
+# ¡IMPORTANTE! Incluir los routers en la app
+app.include_router(lovable_router)
+# app.include_router(main_router)  # Si tienes más routers
+
+# ========== CONFIGURACIÓN FINAL ==========
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+    
